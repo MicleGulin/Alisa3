@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 import logging
 import json
 # импортируем функции из нашего второго файла geo
-from geo import get_country, get_distance, get_coordinates
+from geo import get_distance, get_geo_info
 
 app = Flask(__name__)
 
@@ -36,16 +36,13 @@ def handle_dialog(res, req):
         return
     # Получаем города из нашего
     cities = get_cities(req)
-    if not cities:
-        res['response']['text'] = 'Ты не написал название ни одного города!'
+    if len(cities) == 0:
+        res['response']['text'] = 'Ты не написал название не одного города!'
     elif len(cities) == 1:
-        res['response']['text'] = 'Этот город в стране - ' + \
-                                  get_country(cities[0])
+        res['response']['text'] = 'Этот город в стране - ' + get_geo_info(cities[0], 'country')
     elif len(cities) == 2:
-        distance = get_distance(get_coordinates(
-            cities[0]), get_coordinates(cities[1]))
-        res['response']['text'] = 'Расстояние между этими городами: ' + \
-                                  str(round(distance)) + ' км.'
+        distance = get_distance(get_geo_info(cities[0], 'coordinates'), get_geo_info(cities[1], 'coordinates'))
+        res['response']['text'] = 'Расстояние между этими городами: ' + str(round(distance)) + ' км.'
     else:
         res['response']['text'] = 'Слишком много городов!'
 
