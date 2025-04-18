@@ -1,5 +1,6 @@
-import requests
 import math
+
+import requests
 
 
 def get_coordinates(city_name):
