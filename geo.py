@@ -1,44 +1,42 @@
-import math
+import requests
+from math import sin, cos, sqrt, atan2, radians
+
 
 import requests
 
-
-def get_geo_info(city, type_info):
-
+def get_geo_info(city_name, type_info):
     url = "https://geocode-maps.yandex.ru/1.x/"
-
     params = {
-        "apikey": "40d1649f-0493-4b70-98ba-98533de7710b",
-        'geocode': city,
-        'format': 'json'
+        'geocode': city_name,
+        'format': 'json',
+        'apikey': "40d1649f-0493-4b70-98ba-98533de7710b"
     }
 
     response = requests.get(url, params)
-    json = response.json()
+    data = response.json()
+
+    geo_object = data['response']['GeoObjectCollection']['featureMember'][0]['GeoObject']
 
     if type_info == 'coordinates':
-        point_str = json['response']['GeoObjectCollection']['featureMember'][0]['GeoObject']['Point']['pos']
-        point_array = [float(x) for x in point_str.split(' ')]
-        return point_array
+        return [float(x) for x in geo_object['Point']['pos'].split(' ')]
     elif type_info == 'country':
-        return json['response']['GeoObjectCollection']['featureMember'][0]['GeoObject']['metaDataProperty'][
-            'GeocoderMetaData']['AddressDetails']['Country']['CountryName']
+        return geo_object['metaDataProperty']['GeocoderMetaData']['AddressDetails']['Country']['CountryName']
 
 
 def get_distance(p1, p2):
-    # p1 и p2 - это кортежи из двух элементов - координаты точек
-    radius = 6373.0
+    R = 6373.0
 
-    lon1 = math.radians(p1[0])
-    lat1 = math.radians(p1[1])
-    lon2 = math.radians(p2[0])
-    lat2 = math.radians(p2[1])
+    lon1 = radians(p1[0])
+    lat1 = radians(p1[1])
+    lon2 = radians(p2[0])
+    lat2 = radians(p2[1])
 
-    d_lon = lon2 - lon1
-    d_lat = lat2 - lat1
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
 
-    a = math.sin(d_lat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(d_lon / 2) ** 2
-    c = 2 * math.atan2(a ** 0.5, (1 - a) ** 0.5)
+    a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
 
-    distance = radius * c
+    distance = R * c
+
     return distance
