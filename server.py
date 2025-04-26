@@ -1,8 +1,9 @@
+# импортируем библиотеки
 from flask import Flask, request, jsonify
-import logging, os, random
-from geocoder import get_distance, get_geo_info
+import logging
 
 app = Flask(__name__)
+
 logging.basicConfig(level=logging.INFO)
 sessionStorage = {}
 
@@ -10,58 +11,84 @@ sessionStorage = {}
 @app.route('/post', methods=['POST'])
 def main():
     logging.info(f'Request: {request.json!r}')
+
     response = {
         'session': request.json['session'],
         'version': request.json['version'],
-        'response': {'end_session': False}
+        'response': {
+            'end_session': False
+        }
     }
 
-    processing_dialog(request.json, response)
+    handle_dialog(request.json, response)
+
     logging.info(f'Response:  {response!r}')
+
+    # Преобразовываем в JSON и возвращаем
     return jsonify(response)
 
 
-def processing_dialog(req, res):
-    user_id = req['session']['user']['user_id']
+def handle_dialog(req, res):
+    user_id = req['session']['user_id']
 
     if req['session']['new']:
-        sessionStorage[user_id] = {'name': None}
-        res['response']['text'] = 'Какое у тебя имя?'
+        sessionStorage[user_id] = {
+            'suggests': [
+                "Не хочу.",
+                "Не буду.",
+                "Отстань!"
+            ],
+            'status': 'elefant'
+        }
+        res['response']['text'] = 'Привет! Купи слона!'
+        res['response']['buttons'] = get_suggests(user_id)
+        return
+
+    if [i for i in req['request']['nlu']['tokens'] if i in ['ладно', 'куплю', 'покупаю', 'хорошо']]:
+
+        if sessionStorage[user_id]['status'] == 'elefant':
+            sessionStorage[user_id]['status'] = 'rabbit'
+            res['response']['text'] = 'Слона можно найти на Яндекс.Маркете! А теперь купи кролика'
+        elif sessionStorage[user_id]['status'] == 'rabbit':
+            sessionStorage[user_id]['status'] = 'elefant'
+            res['response']['text'] = 'Кролика можно найти на Яндекс.Маркете! А теперь купи слона'
+
+        return
+    if sessionStorage[user_id]['status'] == 'elefant':
+        res['response']['text'] = \
+            f"Все говорят '{req['request']['original_utterance']}', а ты купи слона!"
     else:
-        if sessionStorage[user_id]['name']:
-            city = get_city(req)
-            if not city:
-                res['response']['text'] = f"{sessionStorage[user_id]['name']}, ты не написал название ни одного города!"
-            elif len(city) == 1:
-                res['response'][
-                    'text'] = f"{sessionStorage[user_id]['name']}, этот городе в стране {get_geo_info(city[0], 'country')}."
-            elif len(city) == 2:
-                res['response'][
-                    'text'] = f"{sessionStorage[user_id]['name']}, расстояние между городами {round(get_distance(get_geo_info(city[0], 'coordinates'), get_geo_info(city[1], 'coordinates')))}м."
-            else:
-                res['response']['text'] = f"{sessionStorage[user_id]['name']}, слишком много городов. Я запуталась"
-        else:
-            name = get_name(req)
-            if name:
-                sessionStorage[user_id]['name'] = name.capitalize()
-                res['response'][
-                    'text'] = f"Привет, {sessionStorage[user_id]['name']}! Я могу показать город или сказать расстояние между городами! Только напиши название или названия."
-            else:
-                res['response']['text'] = 'Я не расслышала, можешь повторить?'
+        res['response']['text'] = \
+            f"Все говорят '{req['request']['original_utterance']}', а ты купи кролика!"
+    res['response']['buttons'] = get_suggests(user_id)
 
 
-def get_city(req):
-    cities = []
-    for i in req['request']['nlu']['entities']:
-        if i['type'] == 'YANDEX.GEO' and 'city' in i['value']:
-            cities.append(i['value']['city'])
-    return cities
+def get_suggests(user_id):
+    session = sessionStorage[user_id]
 
+    suggests = [
+        {'title': suggest, 'hide': True}
+        for suggest in session['suggests'][:2]
+    ]
 
-def get_name(req):
-    for i in req['request']['nlu']['entities']:
-        if i['type'] == 'YANDEX.FIO':
-            return i['value'].get('first_name', None)
+    session['suggests'] = session['suggests'][1:]
+    sessionStorage[user_id] = session
+    if session['status'] == 'elefant':
+        if len(suggests) < 2:
+            suggests.append({
+                "title": "Ладно",
+                "url": "https://market.yandex.ru/search?text=слон",
+                "hide": True
+            })
+
+    if session['status'] == 'rabbit':
+        if len(suggests) < 2:
+            suggests.append({
+                "title": "Ладно",
+                "url": "https://market.yandex.ru/search?text=кролик",
+                "hide": True
+            })
+    return suggests
 
 
 if __name__ == '__main__':
