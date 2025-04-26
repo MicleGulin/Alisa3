@@ -31,21 +31,21 @@ def processing_dialog(req, res):
         if sessionStorage[user_id]['name']:
             city = get_city(req)
             if not city:
-                res['response']['text'] = f'{sessionStorage[user_id]['name']}, ты не написал название ни одного города!'
+                res['response']['text'] = f"{sessionStorage[user_id]['name']}, ты не написал название ни одного города!"
             elif len(city) == 1:
                 res['response'][
-                    'text'] = f'{sessionStorage[user_id]['name']}, этот городе в стране {get_geo_info(city[0], 'country')}.'
+                    'text'] = f"{sessionStorage[user_id]['name']}, этот городе в стране {get_geo_info(city[0], 'country')}."
             elif len(city) == 2:
                 res['response'][
-                    'text'] = f'{sessionStorage[user_id]['name']}, расстояние между городами {round(get_distance(get_geo_info(city[0], 'coordinates'), get_geo_info(city[1], 'coordinates')))}м.'
+                    'text'] = f"{sessionStorage[user_id]['name']}, расстояние между городами {round(get_distance(get_geo_info(city[0], 'coordinates'), get_geo_info(city[1], 'coordinates')))}м."
             else:
-                res['response']['text'] = f'{sessionStorage[user_id]['name']}, слишком много городов. Я запуталась'
+                res['response']['text'] = f"{sessionStorage[user_id]['name']}, слишком много городов. Я запуталась"
         else:
             name = get_name(req)
             if name:
                 sessionStorage[user_id]['name'] = name.capitalize()
                 res['response'][
-                    'text'] = f'Привет, {sessionStorage[user_id]['name']}! Я могу показать город или сказать расстояние между городами! Только напиши название или названия.'
+                    'text'] = f"Привет, {sessionStorage[user_id]['name']}! Я могу показать город или сказать расстояние между городами! Только напиши название или названия."
             else:
                 res['response']['text'] = 'Я не расслышала, можешь повторить?'
 
