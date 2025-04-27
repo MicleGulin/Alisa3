@@ -1,49 +1,97 @@
-from flask import Flask, request, jsonify
-import logging, os, random
-from geocoder import get_geo_info, get_distance
+import sys
+import random
+import requests
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QPixmap
+from PyQt6.QtWidgets import QApplication, QLabel, QMainWindow, QPushButton, QVBoxLayout, QWidget
 
-app = Flask(__name__)
-logging.basicConfig(level=logging.INFO)
+# Список городов
+CITIES = [
+    "Москва", "Санкт-Петербург", "Новосибирск", "Екатеринбург", "Казань",
+    "Нижний Новгород", "Челябинск", "Самара", "Ростов-на-Дону", "Уфа"
+]
 
-
-@app.route('/post', methods=['POST'])
-def main():
-    logging.info(f'Request: {request.json!r}')
-    response = {
-        'session': request.json['session'],
-        'version': request.json['version'],
-        'response': {'end_session': False}
-    }
-
-    processing_dialog(request.json, response)
-    logging.info(f'Response:  {response!r}')
-    return jsonify(response)
+YANDEX_STATIC_MAPS_API = "https://static-maps.yandex.ru/1.x/"
+YANDEX_GEOCODE_API = "http://geocode-maps.yandex.ru/1.x/"
+YANDEX_GEOCODE_KEY = "8013b162-6b42-4997-9691-77b7074026e0"
 
 
-def processing_dialog(req, res):
-    if req['session']['new']:
-        res['response'][
-            'text'] = 'Привет! Я могу показать город или сказать расстояние между городами! Только напиши название или названия.'
-    else:
-        city = get_city(req)
-        if not city:
-            res['response']['text'] = 'Ты не написал название ни одного города!'
-        elif len(city) == 1:
-            res['response']['text'] = f"Этот городе в стране {get_geo_info(city[0], 'country')}."
-        elif len(city) == 2:
-            res['response'][
-                'text'] = f"Расстояние между городами {get_distance(get_geo_info(city[0], 'coordinates'), get_geo_info(city[1], 'coordinates'))}м."
-        else:
-            res['response']['text'] = 'Слишком много городов. Я запуталась'
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("крестики нолики")
+        self.setFixedSize(600, 450)
+
+        self.map_label = QLabel(self)
+        self.map_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.next_button = QPushButton("Следующий город")
+        self.next_button.clicked.connect(self.show_city)
+        layout = QVBoxLayout()
+        layout.addWidget(self.map_label)
+        layout.addWidget(self.next_button)
+        container = QWidget()
+        container.setLayout(layout)
+        self.setCentralWidget(container)
+
+        self.rem_cities = CITIES.copy()
+        random.shuffle(self.rem_cities)
+
+        self.show_city()
+
+    def show_city(self):
+        if not self.rem_cities:
+            self.rem_cities = CITIES.copy()
+            random.shuffle(self.rem_cities)
+
+        city = self.rem_cities.pop()
+        coords = self.get_city_coords(city)
+        if coords:
+            self.display_map(coords)
+
+    @staticmethod
+    def get_city_coords(city):
+        params = {
+            "apikey": YANDEX_GEOCODE_KEY,
+            "geocode": city,
+            "format": "json"
+        }
+        response = requests.get(YANDEX_GEOCODE_API, params=params)
+        if not response:
+            return None
+        json_data = response.json()
+        pos = json_data["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]["Point"]["pos"]
+        lon, lat = pos.split()
+        return float(lon), float(lat)
 
 
-def get_city(req):
-    cities = []
-    for i in req['request']['nlu']['entities']:
-        if i['type'] == 'YANDEX.GEO' and 'city' in i['value']:
-            cities.append(i['value']['city'])
-    return cities
+    def display_map(self, coords):
+        lon, lat = coords
+        map_params = {
+            "ll": f"{lon},{lat}",
+            "z": 12,
+            "l": "sat"
+        }
+
+        response = requests.get(YANDEX_STATIC_MAPS_API, params=map_params)
+        print(response.reason)
+        print(response.url)
+        if not response:
+            return
+
+        with open("city.jpg", "wb") as f:
+            f.write(response.content)
+
+        pixmap = QPixmap("city.jpg")
+        self.map_label.setPixmap(pixmap)
 
 
-if __name__ == '__main__':
-    app.run()
+def except_hook(cls, exception, traceback):
+    sys.__excepthook__(cls, exception, traceback)
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    sys.excepthook = except_hook
+    game_window = MainWindow()
+    game_window.show()
+    sys.exit(app.exec())
